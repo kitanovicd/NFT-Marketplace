@@ -61,8 +61,12 @@ contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
             revert NotAllowed();
         }
 
-        IERC721(nftAddress).transferFrom(address(this), msg.sender, tokenId);
         delete itemsForSale[nftAddress][tokenId];
+        IERC721(nftAddress).safeTransferFrom(
+            address(this),
+            msg.sender,
+            tokenId
+        );
 
         emit ItemUnlisted(msg.sender, nftAddress, tokenId);
     }
@@ -78,7 +82,11 @@ contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
         amountToClaim[itemsForSale[nftAddress][tokenId].seller] += msg.value;
         delete itemsForSale[nftAddress][tokenId];
 
-        IERC721(nftAddress).transferFrom(address(this), msg.sender, tokenId);
+        IERC721(nftAddress).safeTransferFrom(
+            address(this),
+            msg.sender,
+            tokenId
+        );
 
         emit ItemBought(msg.sender, nftAddress, tokenId, msg.value);
     }
@@ -95,5 +103,14 @@ contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
         address from,
         uint256 tokenId,
         bytes calldata data
-    ) external override returns (bytes4) {}
+    ) external override returns (bytes4) {
+        return this.onERC721Received.selector;
+    }
+
+    function getItemForSale(
+        address nftAddress,
+        uint256 tokenId
+    ) external view returns (ItemInfo memory) {
+        return itemsForSale[nftAddress][tokenId];
+    }
 }
