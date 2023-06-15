@@ -4,8 +4,7 @@ pragma solidity ^0.8.13;
 import {Test} from "forge-std/Test.sol";
 import {NFTMarketplace} from "../src/NFTMarketplace.sol";
 import {MintableERC721} from "./mock/MintableERC721.sol";
-import {NotAllowed} from "../src/NFTMarketplace.sol";
-import {NotEnoughFunds} from "../src/NFTMarketplace.sol";
+import {NotAllowed, NotEnoughFunds} from "../src/Errors.sol";
 
 contract NFTMarketplaceTest is Test {
     address public seller;

@@ -4,9 +4,7 @@ pragma solidity ^0.8.13;
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-
-error NotEnoughFunds();
-error NotAllowed();
+import {NotAllowed, NotEnoughFunds} from "./Errors.sol";
 
 contract NFTMarketplace is IERC721Receiver, ReentrancyGuard {
     struct ItemInfo {
