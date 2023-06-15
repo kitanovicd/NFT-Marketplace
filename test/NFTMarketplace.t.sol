@@ -113,6 +113,7 @@ contract NFTMarketplaceTest is Test {
             nftMarketplace.getItemForSale(address(mintableERC721), 1).price,
             0
         );
+        assertEq(nftMarketplace.amountToClaim(seller), 10 ether);
     }
 
     function testBuyRevertNotEnoughFunds() public {
@@ -125,5 +126,26 @@ contract NFTMarketplaceTest is Test {
         vm.expectRevert(NotEnoughFunds.selector);
         nftMarketplace.buyItem{value: 9 ether}(address(mintableERC721), 1);
         vm.stopPrank();
+    }
+
+    function testClaimFunds() public {
+        vm.startPrank(seller);
+        mintableERC721.approve(address(nftMarketplace), 1);
+        nftMarketplace.listItem(address(mintableERC721), 1, 10 ether);
+        vm.stopPrank();
+
+        vm.startPrank(buyer);
+        nftMarketplace.buyItem{value: 10 ether}(address(mintableERC721), 1);
+        vm.stopPrank();
+
+        vm.startPrank(seller);
+
+        uint256 sellerBalanceBefore = seller.balance;
+        nftMarketplace.claimFunds();
+        uint256 sellerBalanceAfter = seller.balance;
+
+        vm.stopPrank();
+
+        assertEq(sellerBalanceAfter, sellerBalanceBefore + 10 ether);
     }
 }
