@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import "../src/Errors.sol";
 import {Test} from "forge-std/Test.sol";
 import {AuctionNFTMarketplace} from "../src/AuctionNFTMarkeplace.sol";
 import {MintableERC721} from "./mock/MintableERC721.sol";
-import {NotAllowed, NotEnoughFunds} from "../src/Errors.sol";
-import "forge-std/console.sol";
 
 contract AuctionNFTMarketplaceTest is Test {
     address public seller;
@@ -151,5 +150,196 @@ contract AuctionNFTMarketplaceTest is Test {
         );
         assertEq(bidder2BalanceAfter, bidder2BalanceBefore - bidAmount2);
         assertEq(bidder1BalanceAfter, bidder1BalanceBefore);
+    }
+
+    function testBidRevertAuctionFinished() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(bidder1);
+        vm.warp(block.timestamp + duration + 1);
+        vm.expectRevert(AuctionFinished.selector);
+        auctionNFTMarketplace.bid{value: startPrice + 1}(0);
+
+        vm.stopPrank();
+    }
+
+    function testBidRevertNotEnoughFunds() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(bidder1);
+        vm.expectRevert(NotEnoughFunds.selector);
+        auctionNFTMarketplace.bid{value: startPrice - 1}(0);
+
+        vm.stopPrank();
+    }
+
+    function testCloseAuction() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(bidder1);
+
+        uint256 bidAmount = startPrice + 1;
+        auctionNFTMarketplace.bid{value: bidAmount}(0);
+
+        vm.stopPrank();
+        vm.startPrank(seller);
+        vm.warp(block.timestamp + duration + 1);
+
+        uint256 auctionNFTMarketplaceBalanceBefore = address(
+            auctionNFTMarketplace
+        ).balance;
+        uint256 sellerBalanceBefore = seller.balance;
+
+        auctionNFTMarketplace.closeAuction(0);
+
+        uint256 auctionNFTMarketplaceBalanceAfter = address(
+            auctionNFTMarketplace
+        ).balance;
+        uint256 sellerBalanceAfter = seller.balance;
+
+        assertEq(
+            auctionNFTMarketplaceBalanceAfter,
+            auctionNFTMarketplaceBalanceBefore - bidAmount
+        );
+        assertEq(sellerBalanceAfter, sellerBalanceBefore + bidAmount);
+        assertEq(mintableERC721.ownerOf(1), bidder1);
+    }
+
+    function testCloseAuctionWithoutBids() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(seller);
+        vm.warp(block.timestamp + duration + 1);
+
+        uint256 auctionNFTMarketplaceBalanceBefore = address(
+            auctionNFTMarketplace
+        ).balance;
+        uint256 sellerBalanceBefore = seller.balance;
+
+        auctionNFTMarketplace.closeAuction(0);
+
+        uint256 auctionNFTMarketplaceBalanceAfter = address(
+            auctionNFTMarketplace
+        ).balance;
+        uint256 sellerBalanceAfter = seller.balance;
+
+        assertEq(
+            auctionNFTMarketplaceBalanceAfter,
+            auctionNFTMarketplaceBalanceBefore
+        );
+        assertEq(sellerBalanceAfter, sellerBalanceBefore);
+        assertEq(mintableERC721.ownerOf(1), seller);
+    }
+
+    function testCloseAuctionRevertAuctionNotFinished() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(seller);
+        vm.warp(block.timestamp + duration - 1);
+        vm.expectRevert(AuctionNotFinished.selector);
+        auctionNFTMarketplace.closeAuction(0);
+
+        vm.stopPrank();
+    }
+
+    function testCloseAuctionRevertOnlyOwnerCanCloseAuction() public {
+        this.setUp();
+        vm.startPrank(seller);
+
+        uint256 startPrice = 10 ether;
+        uint256 duration = 1 days;
+        uint256 fee = (startPrice *
+            auctionNFTMarketplace.AUCTION_FEE_PERCENTAGE()) / 100;
+
+        mintableERC721.approve(address(auctionNFTMarketplace), 1);
+        auctionNFTMarketplace.startAuction{value: fee}(
+            address(mintableERC721),
+            1,
+            startPrice,
+            duration
+        );
+
+        vm.stopPrank();
+        vm.startPrank(bidder1);
+        vm.warp(block.timestamp + duration + 1);
+        vm.expectRevert(OnlyOwnerCanCloseAuction.selector);
+        auctionNFTMarketplace.closeAuction(0);
+
+        vm.stopPrank();
     }
 }

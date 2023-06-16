@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import "./Errors.sol";
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
-import {NotEnoughFunds, AuctionFinished, EthTransferFailed, AuctionNotFinished} from "./Errors.sol";
-import "forge-std/console.sol";
 
 contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
     struct AuctionInfo {
@@ -118,6 +117,9 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
 
         if (auction.auctionEndTimestamp > block.timestamp) {
             revert AuctionNotFinished();
+        }
+        if (auction.seller != msg.sender) {
+            revert OnlyOwnerCanCloseAuction();
         }
 
         if (auction.currentBidder == address(0x0)) {

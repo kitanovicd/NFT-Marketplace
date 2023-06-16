@@ -6,3 +6,4 @@ error NotAllowed();
 error AuctionFinished();
 error AuctionNotFinished();
 error EthTransferFailed();
+error OnlyOwnerCanCloseAuction();
