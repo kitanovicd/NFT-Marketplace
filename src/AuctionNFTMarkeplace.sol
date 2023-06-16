@@ -6,6 +6,7 @@ import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IER
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {NotEnoughFunds, AuctionFinished, EthTransferFailed, AuctionNotFinished} from "./Errors.sol";
+import "forge-std/console.sol";
 
 contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
     struct AuctionInfo {
@@ -19,7 +20,7 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
 
     uint256 public constant AUCTION_FEE_PERCENTAGE = 5;
     uint256 public feeBalance;
-    AuctionInfo[] public auctions;
+    AuctionInfo[] private auctions;
 
     event AuctionStarted(
         address seller,
@@ -92,7 +93,7 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
         if (auction.auctionEndTimestamp < block.timestamp) {
             revert AuctionFinished();
         }
-        if (msg.value > auction.currentBidAmount) {
+        if (msg.value <= auction.currentBidAmount) {
             revert NotEnoughFunds();
         }
 
@@ -143,9 +144,13 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
         );
     }
 
-    function claimFees() public onlyOwner {
+    function claimFees() external onlyOwner {
         _safeTransferETH(msg.sender, feeBalance);
         feeBalance = 0;
+    }
+
+    function getAuction(uint256 id) external view returns (AuctionInfo memory) {
+        return auctions[id];
     }
 
     function onERC721Received(
