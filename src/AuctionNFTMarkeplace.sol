@@ -4,9 +4,10 @@ pragma solidity ^0.8.13;
 import {IERC721} from "openzeppelin-contracts/contracts/token/ERC721/IERC721.sol";
 import {IERC721Receiver} from "openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol";
 import {ReentrancyGuard} from "openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import {Ownable} from "openzeppelin-contracts/contracts/access/Ownable.sol";
 import {NotEnoughFunds, AuctionFinished, EthTransferFailed, AuctionNotFinished} from "./Errors.sol";
 
-contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
+contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard, Ownable {
     struct AuctionInfo {
         address seller;
         address nftAddress;
@@ -17,7 +18,7 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
     }
 
     uint256 public constant AUCTION_FEE_PERCENTAGE = 5;
-
+    uint256 public feeBalance;
     AuctionInfo[] public auctions;
 
     event AuctionStarted(
@@ -50,9 +51,13 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
         uint256 startPrice,
         uint256 auctionDuration
     ) external payable {
-        if (msg.value < (startPrice * AUCTION_FEE_PERCENTAGE) / 100) {
+        uint256 feeAmount = (startPrice * AUCTION_FEE_PERCENTAGE) / 100;
+
+        if (msg.value < feeAmount) {
             revert NotEnoughFunds();
         }
+
+        feeBalance += feeAmount;
 
         IERC721(nftAddress).safeTransferFrom(
             msg.sender,
@@ -87,18 +92,16 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
         if (auction.auctionEndTimestamp < block.timestamp) {
             revert AuctionFinished();
         }
-
         if (msg.value > auction.currentBidAmount) {
-            if (auction.currentBidder != address(0x0)) {
-                _safeTransferETH(
-                    auction.currentBidder,
-                    auction.currentBidAmount
-                );
-            }
-
-            auction.currentBidder = msg.sender;
-            auction.currentBidAmount = msg.value;
+            revert NotEnoughFunds();
         }
+
+        if (auction.currentBidder != address(0x0)) {
+            _safeTransferETH(auction.currentBidder, auction.currentBidAmount);
+        }
+
+        auction.currentBidder = msg.sender;
+        auction.currentBidAmount = msg.value;
 
         emit AuctionBid(
             auctionId,
@@ -117,7 +120,7 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
         }
 
         if (auction.currentBidder == address(0x0)) {
-            IERC721(auction.nftAddress).transferFrom(
+            IERC721(auction.nftAddress).safeTransferFrom(
                 address(this),
                 auction.seller,
                 auction.tokenId
@@ -138,6 +141,11 @@ contract AuctionNFTMarketplace is IERC721Receiver, ReentrancyGuard {
             auction.currentBidder,
             auction.currentBidAmount
         );
+    }
+
+    function claimFees() public onlyOwner {
+        _safeTransferETH(msg.sender, feeBalance);
+        feeBalance = 0;
     }
 
     function onERC721Received(
